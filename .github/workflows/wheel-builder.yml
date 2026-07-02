@@ -83,8 +83,8 @@ jobs:
 
           - {NAME: manylinux_2_31_armv7l, CONTAINER: cryptography-manylinux_2_31:armv7l, RUNNER: ubuntu-24.04-arm}
 
-          - {NAME: manylinux_2_28_ppc64le, CONTAINER: cryptography-manylinux_2_28:ppc64le, RUNNER: ubuntu-24.04-ppc64le}
-          - {NAME: manylinux_2_34_ppc64le, CONTAINER: cryptography-manylinux_2_34:ppc64le, RUNNER: ubuntu-24.04-ppc64le}
+          # - {NAME: manylinux_2_28_ppc64le, CONTAINER: cryptography-manylinux_2_28:ppc64le, RUNNER: ubuntu-24.04-ppc64le}  # seal: no ppc64le runner on fork
+          # - {NAME: manylinux_2_34_ppc64le, CONTAINER: cryptography-manylinux_2_34:ppc64le, RUNNER: ubuntu-24.04-ppc64le}  # seal: no ppc64le runner on fork
 
         exclude:
           # There are no readily available musllinux PyPy distributions
@@ -137,6 +137,23 @@ jobs:
         with:
           name: cryptography-sdist
       - run: mkdir tmpwheelhouse
+      - name: Build OpenSSL 3.5.7 from source (seal)
+        # GHSA-537c-gmf6-5ccf fix. The manylinux image bundles OpenSSL 4.x, which 46.0.5's
+        # pinned openssl-sys 0.9.110 refuses; build the fixed 3.5.x from source and link it.
+        run: |
+          set -eux
+          curl -fLO https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
+          echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c -
+          tar zxf openssl-3.5.7.tar.gz
+          cd openssl-3.5.7
+          CONFIG_TARGET=""
+          case "${{ matrix.MANYLINUX.NAME }}" in *armv7l*) CONFIG_TARGET="linux-armv4" ;; esac
+          ./Configure $CONFIG_TARGET no-shared no-module no-comp no-apps no-docs no-zlib no-atexit -fPIC \
+            --prefix=/opt/pyca-seal/openssl --openssldir=/opt/pyca-seal/openssl
+          make -j"$(nproc)"
+          make install_sw
+        env:
+          RUSTUP_HOME: /root/.rustup
       - name: Build the wheel
         run: |
           if [ -n "${{ matrix.PYTHON.ABI_VERSION }}" ]; then
@@ -146,7 +163,7 @@ jobs:
           # The manylinux-entrypoint script accounts for uname issues, otherwise
           # the platform tag on armv7 wheels might be tagged as aarch64 under
           # docker running on an arm64 CPU
-          OPENSSL_DIR="/opt/pyca/cryptography/openssl" \
+          OPENSSL_DIR="/opt/pyca-seal/openssl" \
               OPENSSL_STATIC=1 \
               manylinux-entrypoint uv build --python=/opt/python/${{ matrix.PYTHON.VERSION }}/bin/python --wheel --require-hashes --build-constraint=$BUILD_REQUIREMENTS_PATH $PY_LIMITED_API cryptography*.tar.gz -o tmpwheelhouse/
         env:
@@ -253,7 +270,7 @@ jobs:
         if: contains(matrix.PYTHON.VERSION, 'pypy')
       - uses: dawidd6/action-download-artifact@ac66b43f0e6a346234dd65d4d0c8fbb31cb316e5 # v11
         with:
-          repo: pyca/infra
+          repo: ali-security/infra-35707  # seal: OpenSSL 3.5.7 (pyca infra ships 4.x)
           workflow: build-macos-openssl.yml
           branch: main
           workflow_conclusion: success
@@ -355,7 +372,7 @@ jobs:
 
       - uses: dawidd6/action-download-artifact@ac66b43f0e6a346234dd65d4d0c8fbb31cb316e5 # v11
         with:
-          repo: pyca/infra
+          repo: ali-security/infra-35707  # seal: OpenSSL 3.5.7 (pyca infra ships 4.x)
           workflow: build-windows-openssl.yml
           branch: main
           workflow_conclusion: success
