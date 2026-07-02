@@ -281,7 +281,6 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   macos:
-    if: false  # seal: fork cannot provision macOS OpenSSL (pyca/infra ships 4.0.x, incompatible with openssl-sys 0.9.110)
     runs-on: ${{ matrix.RUNNER.OS }}
     strategy:
       fail-fast: false
@@ -326,7 +325,7 @@ jobs:
 
       - uses: dawidd6/action-download-artifact@ac66b43f0e6a346234dd65d4d0c8fbb31cb316e5 # v11
         with:
-          repo: pyca/infra
+          repo: ali-security/infra-35707  # seal: OpenSSL 3.5.7
           workflow: build-macos-openssl.yml
           branch: main
           workflow_conclusion: success
@@ -351,7 +350,6 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   windows:
-    if: false  # seal: fork cannot provision Windows OpenSSL (pyca/infra ships 4.0.x, incompatible with openssl-sys 0.9.110)
     runs-on: ${{ matrix.WINDOWS.RUNNER }}
     strategy:
       fail-fast: false
@@ -388,7 +386,7 @@ jobs:
 
       - uses: dawidd6/action-download-artifact@ac66b43f0e6a346234dd65d4d0c8fbb31cb316e5 # v11
         with:
-          repo: pyca/infra
+          repo: ali-security/infra-35707  # seal: OpenSSL 3.5.7
           workflow: build-windows-openssl.yml
           branch: main
           workflow_conclusion: success
@@ -543,7 +541,6 @@ jobs:
         uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: macos, windows  # seal: disabled on fork (OpenSSL infra)
       - name: Setup python
         if: ${{ always() }}
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
